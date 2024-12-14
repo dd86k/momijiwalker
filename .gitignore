@@ -1,0 +1,17 @@
+.dub
+docs.json
+__dummy.html
+docs/
+/momijiwalker
+momijiwalker.so
+momijiwalker.dylib
+momijiwalker.dll
+momijiwalker.a
+momijiwalker.lib
+momijiwalker-test-*
+*.exe
+*.pdb
+*.o
+*.obj
+*.lst
+*.json
