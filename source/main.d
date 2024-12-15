@@ -40,6 +40,7 @@ int main(string[] args)
     bool osubdep;
     bool oversion;
     GetoptResult optres = void;
+    // TODO: --info: Print library info (flags, symbol flags, etc.)
     try optres = getopt(args, config.caseSensitive,
         "sub",     "Get sub-dependencies", &osubdep,
         "version", "Print version page and exit", &oversion);
@@ -81,14 +82,14 @@ int main(string[] args)
             // Only should sub-dependencies if asked
             if (osubdep == false)
                 continue;
+            // Can't continue if not found
+            if (depfull is null)
+                continue;
             
-            try foreach (string sub; walker.dependsOn(dep))
+            foreach (string sub; walker.dependsOn(dep))
             {
-                printName(2, sub);
-            }
-            catch (Exception ex)
-            {
-                
+                string subfull = walker.findInPath(sub);
+                printName(2, sub, subfull ? null : "(Not found)");
             }
         }
     }

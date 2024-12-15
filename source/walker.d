@@ -10,8 +10,6 @@ import std.path;
 import std.process : environment;
 import std.string : toStringz, fromStringz;
 
-import std.stdio; // tmp
-
 enum LibraryFlags
 {
     notFound = 1,
@@ -93,7 +91,7 @@ class Walker
             while ((im = adbg_object_pe_import(o, i++)) != null)
             {
                 string modname = cast(string)fromStringz( adbg_object_pe_import_module_name(o, im) );
-                libs ~= modname.idup;
+                libs ~= modname.idup; // dup due to stringz
             }
             break;
         default:
@@ -106,12 +104,16 @@ class Walker
     // walk all directories from PATH to find library path
     string findInPath(string basename)
     {
-        // TODO: cache path from basenames
+        if (const(string) *pp = basename in pathCache)
+        {
+            return cast()*pp;
+        }
         foreach (string dir; PATH)
         {
             string p = buildPath(dir, basename);
             if (exists(p))
             {
+                pathCache[basename] = p;
                 return p;
             }
         }
@@ -155,9 +157,10 @@ private:
     
     // PATH array
     string[] PATH;
+    // Cache for findinPath
+    string[string] pathCache;
     
     // Symbol list cache
     // key: lib name
-    // data: symbol list
     Library[string] cache;
 }
