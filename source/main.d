@@ -6,16 +6,17 @@ import walker;
 
 static immutable string VERSION = "0.0.0";
 
+void printName(int level, string name)
+{
+    for (int i = 1; i < level; ++i)
+        write("   ");
+    writeln("+- ", name);
+}
+
 void printSpacing(int level)
 {
     for (int i; i < level; ++i)
         write("   ");
-}
-
-void printEntry(ref Library lib, int level)
-{
-    printSpacing(level);
-    writeln("+- ", lib.name);
 }
 
 void printSymbols(ref Library lib, int level)
@@ -63,17 +64,22 @@ int main(string[] args)
     }
     
     scope Walker walker = new Walker();
-    
-    Library root = walker.scan(args[1]);
-    
-    // Print root level
-    writeln(root.name);
-    
-    // Print dependencies
-    int level;
-    foreach (ref Library dep; root.dependencies)
+    foreach (string arg; args[1..$])
     {
-        printEntry(dep, level);
+        Library root = walker.scan(arg);
+        //printName(0, root.name);
+        writeln(root.name);
+        
+        foreach (string dep; root.dependencies)
+        {
+            printName(1, dep);
+            
+            // TODO: if subs:
+            foreach (string sub; walker.dependsOn(dep))
+            {
+                printName(2, sub);
+            }
+        }
     }
     
     return 0;
