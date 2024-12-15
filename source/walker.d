@@ -58,6 +58,11 @@ class Walker
         return root;
     }
     
+    string[] symbols(ref Library lib)
+    {
+        throw new Exception("Todo");
+    }
+    
     string[] dependsOn(string path)
     {
         // Find mentioned library
@@ -77,7 +82,7 @@ class Walker
             throw new AlicedbgException();
         scope(exit) adbg_object_close(o);
         
-        // Depending on the library format, get 
+        // Depending on the library format, get its imports
         // TODO: Add obj type enum function in alicedbg
         string[] libs;
         string type = cast(string)fromStringz( adbg_object_type_shortname(o) );
@@ -96,6 +101,21 @@ class Walker
         }
         
         return libs;
+    }
+    
+    // walk all directories from PATH to find library path
+    string findInPath(string basename)
+    {
+        // TODO: cache path from basenames
+        foreach (string dir; PATH)
+        {
+            string p = buildPath(dir, basename);
+            if (exists(p))
+            {
+                return p;
+            }
+        }
+        return null;
     }
     
 private:
@@ -131,20 +151,6 @@ private:
         lib.dependencies = dependsOn(path);
         cache[basename] = lib;
         return lib;
-    }
-    
-    // walk all directories from PATH to find library path
-    string findInPath(string basename)
-    {
-        foreach (string dir; PATH)
-        {
-            string p = buildPath(dir, basename);
-            if (exists(p))
-            {
-                return p;
-            }
-        }
-        return null;
     }
     
     // PATH array

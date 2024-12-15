@@ -6,11 +6,13 @@ import walker;
 
 static immutable string VERSION = "0.0.0";
 
-void printName(int level, string name)
+void printName(int level, string name, string post = null)
 {
     for (int i = 1; i < level; ++i)
         write("   ");
-    writeln("+- ", name);
+    write("+- ", name);
+    if (post) write(" ", post);
+    writeln();
 }
 
 void printSpacing(int level)
@@ -35,9 +37,11 @@ void printError(string text)
 
 int main(string[] args)
 {
+    bool osubdep;
     bool oversion;
     GetoptResult optres = void;
     try optres = getopt(args, config.caseSensitive,
+        "sub",     "Get sub-dependencies", &osubdep,
         "version", "Print version page and exit", &oversion);
     catch (Exception ex)
     {
@@ -67,17 +71,24 @@ int main(string[] args)
     foreach (string arg; args[1..$])
     {
         Library root = walker.scan(arg);
-        //printName(0, root.name);
         writeln(root.name);
         
         foreach (string dep; root.dependencies)
         {
-            printName(1, dep);
+            string depfull = walker.findInPath(dep);
+            printName(1, dep, depfull ? null : "(Not found)");
             
-            // TODO: if subs:
-            foreach (string sub; walker.dependsOn(dep))
+            // Only should sub-dependencies if asked
+            if (osubdep == false)
+                continue;
+            
+            try foreach (string sub; walker.dependsOn(dep))
             {
                 printName(2, sub);
+            }
+            catch (Exception ex)
+            {
+                
             }
         }
     }
