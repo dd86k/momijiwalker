@@ -41,7 +41,10 @@ void process(int level, int max, string path, Walker walker)
     try foreach (string dep; walker.dependsOn(path))
     {
         string depfull = walker.findInPath(dep);
-        printName(level, dep, depfull ? null : "(Not found)");
+        if (depfull)
+            printName(level, depfull, null);
+        else
+            printName(level, dep, "(Not found)");
         
         if (level < max)
         {
