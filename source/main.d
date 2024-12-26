@@ -119,6 +119,7 @@ int main(string[] args)
     bool ohtml;
     bool oversion;
     GetoptResult optres = void;
+    // TODO: --symbols: Include Export symbols
     // TODO: --no-cache (doubt it'll use that much memory but never know)
     // TODO: --info: Print library info (flags, symbol flags, etc.)
     try optres = getopt(args, config.caseSensitive,
@@ -168,11 +169,13 @@ int main(string[] args)
 `<!DOCTYPE html>
 <html>
 <head>
-  <title>test</title>
+  <meta charset="UTF-8">
+  <meta name="author" content="momijiwalker v`~VERSION~`">
+  <title>%s</title>
 </head>
 <body>
 `;
-            writeln(htmlprefix);
+            writefln(htmlprefix, root.name);
             
             writeln(`<p>`, root.name, `</p>`);
             processHTML(0, omax, root.name, walker);
