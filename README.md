@@ -3,24 +3,27 @@
 MomijiWalker is a library dependency walker. It was inspired from
 [Dependency Walker](https://www.dependencywalker.com/).
 
-It is named after Momiji Inubashiri from the Touhou Porject series for her
-ability to see a thousand ri ahead.
+It is named after
+[Momiji Inubashiri](https://en.touhouwiki.net/wiki/Momiji_Inubashiri)
+from the Touhou Project series for her ability to see a thousand
+[ri](https://en.wikipedia.org/wiki/Li_(unit)) ahead.
 
 A dependency walker is a tool that traverses the list of used dynamic libraries
 (DLL on Windows, DYLIB on macOS, and SO on other platforms) and show a list of
 required symbols.
 
-Things it can do:
-- List immediate and sub dependencies (of an additional level so far).
+Features:
+- List immediate and sub dependencies (with a set maximum sublevel).
 - Support for PE32 executables (EXE) and dynamic libraries (DLL).
+- Output results as JSON and as HTML.
 
 TODO:
 - List PE32 import symbols.
 - List PE32 export symbols.
 - Support for Mach-O.
 - Support for ELF.
-- JSON output.
-- String-read dependency list (e.g., looking for `*.dll` in data sections).
+- String-read dependency list.
+  - e.g., looking for `*.dll` in data sections or whole file (separate flags).
 
 # Usage
 
