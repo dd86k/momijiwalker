@@ -82,16 +82,45 @@ JSONValue[] processJSON(int level, int max, string path, Walker walker)
     return jdeps;
 }
 
+void processHTML(int level, int max, string path, Walker walker)
+{
+    writeln(`<ul>`);
+    try foreach (string dep; walker.dependsOn(path))
+    {
+        string depfull = walker.findInPath(dep);
+        if (depfull)
+        {
+            writeln(`<li>`, depfull, `</li>`);
+        }
+        else
+        {
+            writeln(`<li>`, dep, ` (not found)</li>`);
+        }
+        
+        if (level < max)
+        {
+            processHTML(level + 1, max, dep, walker);
+        }
+    }
+    catch (Exception)
+    {
+        
+    }
+    writeln(`</ul>`);
+}
+
 int main(string[] args)
 {
-    int omax = 0;
+    int omax;
     bool ojson;
+    bool ohtml;
     bool oversion;
     GetoptResult optres = void;
-    // TODO: Output as HTML?
+    // TODO: --no-cache (doubt it'll use that much memory but never know)
     // TODO: --info: Print library info (flags, symbol flags, etc.)
     try optres = getopt(args, config.caseSensitive,
         "max",      "Maximum dependency level (default=3)", &omax,
+        "output-html", "Output as HTML", &ohtml,
         "output-json", "Output as JSON", &ojson,
         "version",  "Print version page and exit", &oversion);
     catch (Exception ex)
@@ -130,29 +159,30 @@ int main(string[] args)
             j["depends"] = processJSON(0, omax, root.name, walker);
             write(j.toString());
         }
+        else if (ohtml)
+        {
+            static immutable string htmlprefix =
+`<!DOCTYPE html>
+<html>
+<head>
+  <title>test</title>
+</head>
+<body>
+`;
+            writeln(htmlprefix);
+            
+            writeln(`<p>`, root.name, `</p>`);
+            processHTML(0, omax, root.name, walker);
+            
+            static immutable string htmlpostfix =
+`</body>
+</html>`;
+            writeln(htmlpostfix);
+        }
         else
         {
             writeln(root.name);
             process(0, omax, root.name, walker);
-            
-            /*
-            foreach (string dep; root.dependencies)
-            {
-                string depfull = walker.findInPath(dep);
-                printName(1, dep, depfull ? null : "(Not found)");
-                
-                // 1. Only should sub-dependencies if asked
-                // 2. Can't continue if sub level unavailable
-                if (osubdep == false || depfull is null)
-                    continue;
-                
-                foreach (string sub; walker.dependsOn(dep))
-                {
-                    string subfull = walker.findInPath(sub);
-                    printName(2, sub, subfull ? null : "(Not found)");
-                }
-            }
-            */
         }
     }
     
