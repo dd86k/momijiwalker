@@ -4,9 +4,9 @@ import adbg.error;
 import adbg.objectserver;
 import adbg.objects.pe;
 import std.algorithm.iteration : splitter;
-import std.conv;
-import std.file;
-import std.path;
+import std.conv : text;
+import std.file : exists, isDir;
+import std.path : buildPath, baseName, dirName, dirSeparator, pathSeparator;
 import std.process : environment;
 import std.string : toStringz, fromStringz;
 
@@ -32,10 +32,12 @@ class AlicedbgException : Exception
 
 class Walker
 {
-    this()
+    this(string target)
     {
-        // Add CWD to PATH to imitate LoadLibrary behavior
-        PATH ~= getcwd();
+        origPath = target;
+        
+        // Add target directory path to PATH to imitate LoadLibrary behavior
+        PATH ~= dirName(target);
         
         // Add paths from PATH
         string paths = environment["PATH"];
@@ -64,13 +66,11 @@ class Walker
         return null;
     }
     
-    // scan dependencies of this file or dynamic library
-    // TODO: bool symbols = get exported symbols
-    // TODO: int maxlevels = max number of passes to sublibraries
-    Library scan(string path)
+    // scan first set of dependencies for selected file
+    Library scan()
     {
         // First level is the requested exec/lib
-        Library root = scanfile(path);
+        Library root = scanfile(origPath);
         
         return root;
     }
@@ -154,6 +154,8 @@ private:
         cache[basename] = lib;
         return lib;
     }
+    
+    string origPath;
     
     // PATH array
     string[] PATH;

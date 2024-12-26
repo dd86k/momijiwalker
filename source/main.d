@@ -151,10 +151,10 @@ int main(string[] args)
         return 1;
     }
     
-    scope Walker walker = new Walker();
     foreach (string arg; args[1..$])
     {
-        Library root = walker.scan(arg);
+        scope Walker walker = new Walker(arg);
+        Library root = walker.scan();
         
         if (ojson)
         {
