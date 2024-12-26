@@ -45,6 +45,25 @@ class Walker
         }
     }
     
+    // walk all directories from PATH to find library path
+    string findInPath(string basename)
+    {
+        if (const(string) *pp = basename in pathCache)
+        {
+            return cast()*pp;
+        }
+        foreach (string dir; PATH)
+        {
+            string p = buildPath(dir, basename);
+            if (exists(p))
+            {
+                pathCache[basename] = p;
+                return p;
+            }
+        }
+        return null;
+    }
+    
     // scan dependencies of this file or dynamic library
     // TODO: bool symbols = get exported symbols
     // TODO: int maxlevels = max number of passes to sublibraries
@@ -99,25 +118,6 @@ class Walker
         }
         
         return libs;
-    }
-    
-    // walk all directories from PATH to find library path
-    string findInPath(string basename)
-    {
-        if (const(string) *pp = basename in pathCache)
-        {
-            return cast()*pp;
-        }
-        foreach (string dir; PATH)
-        {
-            string p = buildPath(dir, basename);
-            if (exists(p))
-            {
-                pathCache[basename] = p;
-                return p;
-            }
-        }
-        return null;
     }
     
 private:
