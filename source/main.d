@@ -3,32 +3,17 @@ module main;
 import std.stdio;
 import std.getopt;
 import std.json;
-import walker;
+import std.file : exists;
+import pathutils, loader;
 
 static immutable string VERSION = "0.0.0";
 
-void printName(int level, string name, string post = null)
+void printOut(int level, string modulePath, bool found)
 {
-    for (int i; i < level; ++i)
-        write("   ");
-    write("+- ", name);
-    if (post) write(" ", post);
-    writeln();
-}
-
-void printSpacing(int level)
-{
-    for (int i; i < level; ++i)
-        write("   ");
-}
-
-void printSymbols(ref Library lib, int level)
-{
-    foreach (symbol; lib.symbols)
-    {
-        printSpacing(level + 1);
-        writeln(symbol);
-    }
+    for (int i; i < level; ++i) write("   ");
+    write("+- ");
+    if (found == false) write("Not found: ");
+    writeln(modulePath);
 }
 
 void printError(string text)
@@ -36,44 +21,59 @@ void printError(string text)
     stderr.writeln("error: ", text);
 }
 
-void process(int level, int max, string path, Walker walker)
+//
+//
+//
+
+void process(int level, string path, int max, PathCache pathcache, ImportCache impcache)
 {
-    try foreach (string dep; walker.dependsOn(path))
+    try foreach (ref Import imp; impcache.getImports(path))
     {
-        string depfull = walker.findInPath(dep);
-        if (depfull)
-            printName(level, depfull, null);
-        else
-            printName(level, dep, "(Not found)");
+        string subfullpath = pathcache.get(imp.name);
+        if (subfullpath is null)
+        {
+            printOut(level, imp.name, false);
+            continue;
+        }
+        
+        printOut(level, subfullpath, true);
+        
+        // TODO: Import symbols
+        // TODO: Export symbols
         
         if (level < max)
         {
-            process(level + 1, max, dep, walker);
+            process(level + 1, subfullpath, max, pathcache, impcache);
         }
     }
-    catch (Exception)
+    catch (Exception ex)
     {
         
     }
 }
 
-JSONValue[] processJSON(int level, int max, string path, Walker walker)
+JSONValue[] processJSON(int level, string path, int max, PathCache pathcache, ImportCache impcache)
 {
     JSONValue[] jdeps;
-    try foreach (string dep; walker.dependsOn(path))
+    try foreach (ref Import imp; impcache.getImports(path))
     {
-        string depfull = walker.findInPath(dep);
-        
+        string subfullpath = pathcache.get(imp.name);
         JSONValue jdep;
-        jdep["name"] = dep;
-        jdep["exists"] = depfull !is null;
-        if (depfull) jdep["path"] = depfull;
+        jdep["name"] = imp.name;
         
-        if (level < max)
+        if (subfullpath)
         {
-            JSONValue[] subs = processJSON(level + 1, max, dep, walker);
-            if (subs.length)
-                jdep["depends"] = subs;
+            jdep["path"] = subfullpath;
+        
+            // TODO: Import symbols in JSON
+            // TODO: Export symbols in JSON
+        
+            if (level < max)
+            {
+                JSONValue[] subs = processJSON(level + 1, subfullpath, max, pathcache, impcache);
+                if (subs.length)
+                    jdep["depends"] = subs;
+            }
         }
         
         jdeps ~= jdep;
@@ -85,24 +85,25 @@ JSONValue[] processJSON(int level, int max, string path, Walker walker)
     return jdeps;
 }
 
-void processHTML(int level, int max, string path, Walker walker)
+void processHTML(int level, string path, int max, PathCache pathcache, ImportCache impcache)
 {
     writeln(`<ul>`);
-    try foreach (string dep; walker.dependsOn(path))
+    try foreach (ref Import imp; impcache.getImports(path))
     {
-        string depfull = walker.findInPath(dep);
-        if (depfull)
+        string subfullpath = pathcache.get(imp.name);
+        if (subfullpath)
         {
-            writeln(`<li>`, depfull, `</li>`);
+            writeln(`<li>Not found: `, imp.name, `</li>`);
+            continue;
         }
-        else
-        {
-            writeln(`<li>`, dep, ` (not found)</li>`);
-        }
+        writeln(`<li>`, subfullpath, `</li>`);
+        
+        // TODO: Import symbols in HTML
+        // TODO: Export symbols in HTML
         
         if (level < max)
         {
-            processHTML(level + 1, max, dep, walker);
+            processHTML(level + 1, subfullpath, max, pathcache, impcache);
         }
     }
     catch (Exception)
@@ -119,14 +120,16 @@ int main(string[] args)
     bool ohtml;
     bool oversion;
     GetoptResult optres = void;
-    // TODO: --symbols: Include Export symbols
+    // TODO: --base: Base directory (to avoid using cwd)
+    // TODO: --import-symbols: Include Import symbols
+    // TODO: --export-symbols: Include Export symbols
     // TODO: --no-cache (doubt it'll use that much memory but never know)
     // TODO: --info: Print library info (flags, symbol flags, etc.)
     try optres = getopt(args, config.caseSensitive,
-        "max",      "Maximum dependency level (default=3)", &omax,
-        "output-html", "Output as HTML", &ohtml,
-        "output-json", "Output as JSON", &ojson,
-        "version",  "Print version page and exit", &oversion);
+        "max",          "Maximum dependency level (default=0)", &omax,
+        "output-html",  "Output as HTML", &ohtml,
+        "output-json",  "Output as JSON", &ojson,
+        "version",      "Print version page and exit", &oversion);
     catch (Exception ex)
     {
         printError(ex.msg);
@@ -153,42 +156,48 @@ int main(string[] args)
     
     foreach (string arg; args[1..$])
     {
-        scope Walker walker = new Walker(arg);
-        Library root = walker.scan();
+        // If a name in PATH is mentionned, cache will be able to get it
+        // by searching in PATH
+        scope PathCache pathcache = new PathCache(arg);
+        string fullinit = pathcache.get(arg);
+        if (fullinit is null)
+        {
+            stderr.writeln("error: File '", arg, "' not found at location or in PATH");
+            continue;
+        }
+        
+        scope ImportCache impcache = new ImportCache();
         
         if (ojson)
         {
             JSONValue j;
-            j["name"] = root.name;
-            j["depends"] = processJSON(0, omax, root.name, walker);
+            j["name"] = fullinit;
+            j["depends"] = processJSON(0, fullinit, omax, pathcache, impcache);
             write(j.toString());
         }
         else if (ohtml)
         {
-            static immutable string htmlprefix =
+            writeln(
 `<!DOCTYPE html>
 <html>
 <head>
   <meta charset="UTF-8">
-  <meta name="author" content="momijiwalker v`~VERSION~`">
-  <title>%s</title>
+  <meta name="author" content="momijiwalker v`, VERSION, `">
+  <title>`, arg, `</title>
 </head>
 <body>
-`;
-            writefln(htmlprefix, root.name);
+  <p>`, fullinit, `</p>`);
+
+            processHTML(0, fullinit, omax, pathcache, impcache);
             
-            writeln(`<p>`, root.name, `</p>`);
-            processHTML(0, omax, root.name, walker);
-            
-            static immutable string htmlpostfix =
+            writeln(
 `</body>
-</html>`;
-            writeln(htmlpostfix);
+</html>`);
         }
         else
         {
-            writeln(root.name);
-            process(0, omax, root.name, walker);
+            writeln(fullinit);
+            process(0, fullinit, omax, pathcache, impcache);
         }
     }
     
