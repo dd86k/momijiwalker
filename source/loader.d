@@ -14,17 +14,18 @@ class AlicedbgException : Exception
     }
 }
 
-struct Import
-{
-    string name; // e.g., KERNEL32.dll
-    pe_import_descriptor_t* descriptor;
-}
-
 struct ImportSymbol
 {
     string name; // e.g., GetStdHandle, etc.
     ushort hint;
     uint rva;
+}
+
+struct Import
+{
+    string name; // e.g., KERNEL32.dll
+    pe_import_descriptor_t* descriptor;
+    ImportSymbol[] symbols;
 }
 
 struct Binary
@@ -53,7 +54,7 @@ struct Binary
         adbg_object_close(o);
     }
 
-    Import[] imports()
+    Import[] imports(bool symbols)
     {
         Import[] list;
         final switch (objformat) {
@@ -68,6 +69,19 @@ struct Binary
                 imp.name = adbg_object_pe_import_module_name(o, im)
                     .fromStringz()
                     .idup;
+                
+                size_t i2;
+                void* entry = void;
+                while ((entry = adbg_object_pe_import_entry(o, imp.descriptor, i2++)) != null)
+                {
+                    ImportSymbol sym;
+                    sym.name = adbg_object_pe_import_entry_string(o, imp.descriptor, entry)
+                        .fromStringz()
+                        .idup;
+                    sym.hint = adbg_object_pe_import_entry_hint(o, imp.descriptor, entry);
+                    sym.rva = adbg_object_pe_import_entry_rva(o, imp.descriptor, entry);
+                    imp.symbols ~= sym;
+                }
 
                 list ~= imp;
             }
@@ -82,18 +96,6 @@ struct Binary
         final switch (objformat) {
         case FORMAT_PE32:
             assert(imp.descriptor);
-            size_t i;
-            void* entry = void;
-            while ((entry = adbg_object_pe_import_entry(o, imp.descriptor, i++)) != null)
-            {
-                ImportSymbol sym;
-                sym.name = adbg_object_pe_import_entry_string(o, imp.descriptor, entry)
-                    .fromStringz()
-                    .idup;
-                sym.hint = adbg_object_pe_import_entry_hint(o, imp.descriptor, entry);
-                sym.rva = adbg_object_pe_import_entry_rva(o, imp.descriptor, entry);
-                syms ~= sym;
-            }
             break;
         }
         return syms;
@@ -113,7 +115,7 @@ private:
 class ImportCache
 {
     // path = path must exist
-    Import[] getImports(string path)
+    Import[] getImports(string path, bool symbols = false)
     {
         if (const(Import[])* cached = path in cache)
         {
@@ -121,7 +123,7 @@ class ImportCache
         }
         
         Binary bin = Binary(path);
-        Import[] imports = bin.imports();
+        Import[] imports = bin.imports(symbols);
         cache[path] = imports;
         return imports;
     }

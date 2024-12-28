@@ -30,6 +30,7 @@ class PathCache
         // Unpackaged Windows (classic Win32) application paths
         
         // TODO: 1. DLL Redirection.
+        //          https://learn.microsoft.com/en-us/windows/win32/dlls/dynamic-link-library-redirection
         
         // TODO: 2. API sets.
         

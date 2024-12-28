@@ -8,14 +8,6 @@ import pathutils, loader;
 
 static immutable string VERSION = "0.0.0";
 
-void printOut(int level, string modulePath, bool found)
-{
-    for (int i; i < level; ++i) write("   ");
-    write("+- ");
-    if (found == false) write("Not found: ");
-    writeln(modulePath);
-}
-
 void printError(string text)
 {
     stderr.writeln("error: ", text);
@@ -28,27 +20,46 @@ void printError(string text)
 struct Options
 {
     int maxlevel;
+    
     bool json;
     bool html;
+    bool includeImportSymbols;
     
     PathCache pathcache = void;
     ImportCache importcache = void;
 }
 
+void printSpaces(int level)
+{
+    for (int i; i < level; ++i) write("   ");
+}
+
 void process(int level, string path, ref Options options)
 {
-    try foreach (ref Import imp; options.importcache.getImports(path))
+    try foreach (ref Import imp; options.importcache.getImports(path, options.includeImportSymbols))
     {
+        // Print spaces relevant to level
+        printSpaces(level);
+        
         string subfullpath = options.pathcache.get(imp.name);
         if (subfullpath is null)
         {
-            printOut(level, imp.name, false);
+            writeln("+- Not found: ", imp.name);
             continue;
         }
         
-        printOut(level, subfullpath, true);
+        writeln("+- ", subfullpath);
         
-        // TODO: Import symbols
+        if (options.includeImportSymbols)
+        {
+            foreach (ref ImportSymbol symbol; imp.symbols)
+            {
+                // Print spaces relevant to level
+                printSpaces(level);
+                writeln("   ", symbol.name);
+            }
+        }
+        
         // TODO: Export symbols
         
         if (level < options.maxlevel)
@@ -135,6 +146,7 @@ int main(string[] args)
     // TODO: --info: Print library info (flags, symbol flags, etc.)
     try getoptResult = getopt(args, config.caseSensitive,
         "max",          "Maximum dependency level (default=0)", &options.maxlevel,
+        "import-symbols","Include import symbols in output", &options.includeImportSymbols,
         "output-html",  "Output as HTML", &options.html,
         "output-json",  "Output as JSON", &options.json,
         "version",      "Print version page and exit", &oversion);
