@@ -25,11 +25,21 @@ void printError(string text)
 //
 //
 
-void process(int level, string path, int max, PathCache pathcache, ImportCache impcache)
+struct Options
 {
-    try foreach (ref Import imp; impcache.getImports(path))
+    int maxlevel;
+    bool json;
+    bool html;
+    
+    PathCache pathcache = void;
+    ImportCache importcache = void;
+}
+
+void process(int level, string path, ref Options options)
+{
+    try foreach (ref Import imp; options.importcache.getImports(path))
     {
-        string subfullpath = pathcache.get(imp.name);
+        string subfullpath = options.pathcache.get(imp.name);
         if (subfullpath is null)
         {
             printOut(level, imp.name, false);
@@ -41,9 +51,9 @@ void process(int level, string path, int max, PathCache pathcache, ImportCache i
         // TODO: Import symbols
         // TODO: Export symbols
         
-        if (level < max)
+        if (level < options.maxlevel)
         {
-            process(level + 1, subfullpath, max, pathcache, impcache);
+            process(level + 1, subfullpath, options);
         }
     }
     catch (Exception ex)
@@ -52,12 +62,12 @@ void process(int level, string path, int max, PathCache pathcache, ImportCache i
     }
 }
 
-JSONValue[] processJSON(int level, string path, int max, PathCache pathcache, ImportCache impcache)
+JSONValue[] processJSON(int level, string path, ref Options options)
 {
     JSONValue[] jdeps;
-    try foreach (ref Import imp; impcache.getImports(path))
+    try foreach (ref Import imp; options.importcache.getImports(path))
     {
-        string subfullpath = pathcache.get(imp.name);
+        string subfullpath = options.pathcache.get(imp.name);
         JSONValue jdep;
         jdep["name"] = imp.name;
         
@@ -68,9 +78,9 @@ JSONValue[] processJSON(int level, string path, int max, PathCache pathcache, Im
             // TODO: Import symbols in JSON
             // TODO: Export symbols in JSON
         
-            if (level < max)
+            if (level < options.maxlevel)
             {
-                JSONValue[] subs = processJSON(level + 1, subfullpath, max, pathcache, impcache);
+                JSONValue[] subs = processJSON(level + 1, subfullpath, options);
                 if (subs.length)
                     jdep["depends"] = subs;
             }
@@ -85,12 +95,12 @@ JSONValue[] processJSON(int level, string path, int max, PathCache pathcache, Im
     return jdeps;
 }
 
-void processHTML(int level, string path, int max, PathCache pathcache, ImportCache impcache)
+void processHTML(int level, string path, ref Options options)
 {
     writeln(`<ul>`);
-    try foreach (ref Import imp; impcache.getImports(path))
+    try foreach (ref Import imp; options.importcache.getImports(path))
     {
-        string subfullpath = pathcache.get(imp.name);
+        string subfullpath = options.pathcache.get(imp.name);
         if (subfullpath)
         {
             writeln(`<li>Not found: `, imp.name, `</li>`);
@@ -101,9 +111,9 @@ void processHTML(int level, string path, int max, PathCache pathcache, ImportCac
         // TODO: Import symbols in HTML
         // TODO: Export symbols in HTML
         
-        if (level < max)
+        if (level < options.maxlevel)
         {
-            processHTML(level + 1, subfullpath, max, pathcache, impcache);
+            processHTML(level + 1, subfullpath, options);
         }
     }
     catch (Exception)
@@ -115,20 +125,18 @@ void processHTML(int level, string path, int max, PathCache pathcache, ImportCac
 
 int main(string[] args)
 {
-    int omax;
-    bool ojson;
-    bool ohtml;
+    Options options;
     bool oversion;
-    GetoptResult optres = void;
+    GetoptResult getoptResult = void;
     // TODO: --base: Base directory (to avoid using cwd)
     // TODO: --import-symbols: Include Import symbols
     // TODO: --export-symbols: Include Export symbols
     // TODO: --no-cache (doubt it'll use that much memory but never know)
     // TODO: --info: Print library info (flags, symbol flags, etc.)
-    try optres = getopt(args, config.caseSensitive,
-        "max",          "Maximum dependency level (default=0)", &omax,
-        "output-html",  "Output as HTML", &ohtml,
-        "output-json",  "Output as JSON", &ojson,
+    try getoptResult = getopt(args, config.caseSensitive,
+        "max",          "Maximum dependency level (default=0)", &options.maxlevel,
+        "output-html",  "Output as HTML", &options.html,
+        "output-json",  "Output as JSON", &options.json,
         "version",      "Print version page and exit", &oversion);
     catch (Exception ex)
     {
@@ -142,9 +150,9 @@ int main(string[] args)
         return 0;
     }
     
-    if (optres.helpWanted)
+    if (getoptResult.helpWanted)
     {
-        defaultGetoptPrinter("Dependency walker", optres.options);
+        defaultGetoptPrinter("Dependency walker", getoptResult.options);
         return 0;
     }
     
@@ -165,17 +173,19 @@ int main(string[] args)
             stderr.writeln("error: File '", arg, "' not found at location or in PATH");
             continue;
         }
+        options.pathcache = pathcache;
         
         scope ImportCache impcache = new ImportCache();
+        options.importcache = impcache;
         
-        if (ojson)
+        if (options.json)
         {
             JSONValue j;
             j["name"] = fullinit;
-            j["depends"] = processJSON(0, fullinit, omax, pathcache, impcache);
+            j["depends"] = processJSON(0, fullinit, options);
             write(j.toString());
         }
-        else if (ohtml)
+        else if (options.html)
         {
             writeln(
 `<!DOCTYPE html>
@@ -188,7 +198,7 @@ int main(string[] args)
 <body>
   <p>`, fullinit, `</p>`);
 
-            processHTML(0, fullinit, omax, pathcache, impcache);
+            processHTML(0, fullinit, options);
             
             writeln(
 `</body>
@@ -197,7 +207,7 @@ int main(string[] args)
         else
         {
             writeln(fullinit);
-            process(0, fullinit, omax, pathcache, impcache);
+            process(0, fullinit, options);
         }
     }
     
